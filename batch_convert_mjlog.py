@@ -42,19 +42,32 @@ def convert_mjlog_to_mjai(mjlog_path: Path, output_dir: Path) -> Tuple[bool, str
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
         
         if result.returncode != 0:
+            # Clean up any partial file created on error
+            if output_path.exists():
+                output_path.unlink()
+            
             if "Skipping unsupported file" in result.stderr:
                 return False, "Unsupported format", output_path
             else:
                 return False, result.stderr[:200], output_path
         
+        # Check if output file was actually created and has content
+        if not output_path.exists() or output_path.stat().st_size == 0:
+            if output_path.exists():
+                output_path.unlink()
+            return False, "Conversion produced empty or no file", output_path
+        
         return True, "Success", output_path
         
     except Exception as e:
+        # Clean up any partial file on exception
+        if output_path.exists():
+            output_path.unlink()
         return False, str(e), output_path
 
 def validate_mjai(mjson_path: Path) -> Tuple[bool, str]:
     """Validate MJAI file with Mortal's validate_logs"""
-    validator_path = Path("C:/hoge/hoge/Mortal-main/target/debug/validate_logs.exe")
+    validator_path = Path("C:/hoge/Mortal-main/target/debug/validate_logs.exe")
     
     if not validator_path.exists():
         return True, "Validator not found, skipping validation"
@@ -81,6 +94,15 @@ def validate_mjai(mjson_path: Path) -> Tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
+def check_bye_event(xml_path: Path) -> bool:
+    """Check if XML file contains BYE event (player disconnection)"""
+    try:
+        with open(xml_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            return 'BYE' in content
+    except Exception:
+        return False
+
 def process_single_file(args: Tuple[Path, Path, Path, bool]) -> dict:
     """Process a single XML file through the entire pipeline"""
     xml_path, temp_dir, output_dir, validate = args
@@ -91,6 +113,12 @@ def process_single_file(args: Tuple[Path, Path, Path, bool]) -> dict:
         'error': None,
         'validation': None
     }
+    
+    # Check for BYE event first
+    if check_bye_event(xml_path):
+        result['status'] = 'skipped'
+        result['error'] = 'Contains BYE event (player disconnection)'
+        return result
     
     try:
         # Step 1: Gzip XML to .mjlog
@@ -191,11 +219,12 @@ def batch_convert(input_dir: Path, output_dir: Path, validate: bool = False,
                     # Status counts
                     successful = sum(1 for r in results if r['status'] == 'converted')
                     failed = sum(1 for r in results if r['status'] in ['failed', 'error'])
+                    skipped = sum(1 for r in results if r['status'] == 'skipped')
                     
                     # Display progress
                     status_line = (f"\r[{bar}] {completed}/{len(xml_files)} "
                                  f"({progress_pct*100:.1f}%) | "
-                                 f"OK: {successful} ERR: {failed} | "
+                                 f"OK: {successful} ERR: {failed} SKIP: {skipped} | "
                                  f"Speed: {rate:.1f} files/s | "
                                  f"ETA: {eta_str}    ")
                     print(status_line, end='', flush=True)
@@ -206,6 +235,7 @@ def batch_convert(input_dir: Path, output_dir: Path, validate: bool = False,
     # Summary statistics
     successful = sum(1 for r in results if r['status'] == 'converted')
     failed = sum(1 for r in results if r['status'] in ['failed', 'error'])
+    skipped = sum(1 for r in results if r['status'] == 'skipped')
     
     # Format total time
     if elapsed_time < 60:
@@ -224,6 +254,7 @@ def batch_convert(input_dir: Path, output_dir: Path, validate: bool = False,
     print(f"Average Speed: {len(xml_files)/elapsed_time:.2f} files/second")
     print(f"Successful: {successful}/{len(xml_files)} ({successful/len(xml_files)*100:.1f}%)")
     print(f"Failed: {failed}/{len(xml_files)} ({failed/len(xml_files)*100:.1f}%)" if failed > 0 else "")
+    print(f"Skipped (BYE event): {skipped}/{len(xml_files)} ({skipped/len(xml_files)*100:.1f}%)" if skipped > 0 else "")
     
     if validate:
         validated = [r for r in results if r['validation'] is not None]
