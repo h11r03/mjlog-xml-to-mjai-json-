@@ -45,16 +45,16 @@ Ruby 3.4では`URI.decode`が廃止されているため、以下の修正が必
 ### 基本的な使用方法
 ```bash
 # ディレクトリ内の全XMLファイルを変換
-python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019
+python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019"
 
 # 検証付きで変換
-python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -v
+python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -v
 
 # 並列度を指定して変換（デフォルト: 4）
-python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -w 8
+python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -w 8
 
 # ファイル数を制限して変換
-python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -l 100
+python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 100
 ```
 
 ### コマンドラインオプション
