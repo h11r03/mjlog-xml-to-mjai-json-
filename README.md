@@ -45,16 +45,16 @@ Ruby 3.4では`URI.decode`が廃止されているため、以下の修正が必
 ### 基本的な使用方法
 ```bash
 # ディレクトリ内の全XMLファイルを変換
-python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019"
+python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019
 
 # 検証付きで変換
-python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -v
+python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -v
 
 # 並列度を指定して変換（デフォルト: 4）
-python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -w 8
+python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -w 8
 
 # ファイル数を制限して変換
-python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 100
+python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -l 100
 ```
 
 ### コマンドラインオプション
@@ -66,11 +66,13 @@ python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 1
 
 ## 処理の流れ
 
-1. **XML読み込み**: 天鳳形式のXMLファイルを読み込み
-2. **Gzip圧縮**: XMLファイルをgzipで圧縮し、.mjlog形式に変換
-3. **MJAI変換**: Ruby mjai gemを使用してMJAI形式に変換
-4. **検証**（オプション）: Mortalのvalidate_logsで形式を検証
-5. **結果出力**: 
+1. **BYEイベント検出**: プレイヤー切断を含むファイルを事前にスキップ
+2. **XML読み込み**: 天鳳形式のXMLファイルを読み込み
+3. **Gzip圧縮**: XMLファイルをgzipで圧縮し、.mjlog形式に変換
+4. **MJAI変換**: Ruby mjai gemを使用してMJAI形式に変換
+5. **エラー処理**: 変換失敗時に不完全なファイルを自動削除
+6. **検証**（オプション）: Mortalのvalidate_logsで形式を検証
+7. **結果出力**: 
    - MJAI形式のJSONファイル（.mjson）
    - 変換結果レポート（conversion_results.json）
 
@@ -95,9 +97,21 @@ python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 1
     "error": null,
     "validation": "passed"
   },
+  {
+    "file": "2019010100gm-00a9-0000-56ec7b96.xml",
+    "status": "skipped",
+    "error": "Contains BYE event (player disconnection)",
+    "validation": null
+  },
   ...
 ]
 ```
+
+ステータスの種類：
+- `converted`: 正常に変換完了
+- `skipped`: BYEイベント（プレイヤー切断）により変換をスキップ
+- `failed`: 変換エラー
+- `error`: 予期しないエラー
 
 ## トラブルシューティング
 
@@ -111,21 +125,44 @@ python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 1
 **原因**: Ruby 3.x での互換性問題
 **対処**: 上記の「mjai gemの互換性修正」を参照
 
-#### 3. 検証エラー
+#### 3. BYEイベントによるスキップ
+**原因**: プレイヤー切断により不完全なゲームデータ
+**対処**: 
+- 自動的にスキップされ、MJSONファイルは作成されません
+- 約10%のファイルがこれに該当する可能性があります
+- conversion_results.jsonで確認可能
+
+#### 4. 変換エラー時のファイル処理
+**原因**: Ruby mjai gemの変換失敗
+**対処**: 
+- 不完全なMJSONファイルは自動削除されます
+- エラーの詳細はconversion_results.jsonに記録されます
+
+#### 5. 検証エラー
 **原因**: MJAIデータの形式不正
 **対処**: 
 - can_riichi, can_kakan等のエラーは元データの問題の可能性
 - Ruby mjai gemの公式実装を使用することで最小化
 
+## パフォーマンス
+
+- **処理速度**: 約0.3秒/ファイル（4並列時）
+- **メモリ使用**: 最小限（ストリーミング処理）
+- **並列度**: CPUコア数に応じて調整可能
+
 ## 注意事項
 
 1. **ファイル拡張子**: 入力XMLファイルは`.xml`拡張子である必要があります
 2. **一時ファイル**: 処理中に一時的な.mjlogファイルが作成されますが、自動削除されます
-3. **エラーハンドリング**: 変換失敗したファイルはスキップされ、レポートに記録されます
+3. **BYEイベント処理**: プレイヤー切断を含むファイルは自動的にスキップされます
+4. **エラーハンドリング**: 
+   - 変換失敗したファイルはスキップされ、レポートに記録されます
+   - 不完全なMJSONファイルは自動削除されます
+5. **データ品質**: 約10%のファイルがBYEイベントにより変換できない可能性があります
 
 ## ライセンス
 このシステムはRuby mjai gemを使用しています。
-mjai gem: https://github.com/gimite/mjai
+mjai gem: https://github.com/gimite/mjai-manue
 
 ## サポート
 問題が発生した場合は、以下を確認してください：
