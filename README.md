@@ -125,7 +125,7 @@ python batch_convert_mjlog.py "dataset/xml(mjlog)/2019" "dataset/mjai/2019" -l 1
 
 ## ライセンス
 このシステムはRuby mjai gemを使用しています。
-mjai gem: https://github.com/gimite/mjai-manue
+mjai gem: https://github.com/gimite/mjai
 
 ## サポート
 問題が発生した場合は、以下を確認してください：
