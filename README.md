@@ -146,8 +146,6 @@ python batch_convert_mjlog.py dataset/xml(mjlog)/2019 dataset/mjai/2019 -l 100
 
 ## パフォーマンス
 
-- **処理速度**: 約0.3秒/ファイル（4並列時）
-- **メモリ使用**: 最小限（ストリーミング処理）
 - **並列度**: CPUコア数に応じて調整可能
 
 ## 注意事項
